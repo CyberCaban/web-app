@@ -1,6 +1,6 @@
-use std::env;
 use dotenv::dotenv;
 use rocket::{figment::value::magic::RelativePathBuf, Config};
+use std::env;
 
 pub fn from_env() -> Config {
     dotenv().ok();
