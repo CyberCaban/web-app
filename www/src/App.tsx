@@ -45,6 +45,18 @@ function App() {
         >
           Click to test POST api!{" "}
         </p>
+        <button
+          onClick={() =>
+            fetch("/api/get_users")
+              .then((res) => res.json())
+              .then((data) => {
+                console.log(data);
+                setMsg(JSON.stringify(data));
+              })
+          }
+        >
+          Click to test db!
+        </button>
       </div>
     </>
   );
