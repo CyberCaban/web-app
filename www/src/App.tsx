@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./App.css";
+import { getData, postData } from "./utils/utils";
 
 function App() {
   const [msg, setMsg] = useState("");
@@ -8,55 +9,63 @@ function App() {
   return (
     <>
       <div className="card">
-        <h1>{msg}</h1>
-        <p
+        <pre style={{ textAlign: "left" }}>{msg}</pre>
+        <button
           onClick={() =>
-            fetch("/api/hello")
-              .then((res) => {
-                return res.json();
-              })
-              .then((data) => {
-                console.log(data);
-                setMsg(data);
-              })
+            getData("/api/hello").then((data) => {
+              console.log(data);
+              setMsg(JSON.stringify(data, null, 2));
+            })
           }
         >
           Click to test GET api!
-        </p>
+        </button>
         <input
           type="text"
           name="name"
           id="name"
           onChange={(e) => setName(e.target.value)}
         />
-        <p
+        <button
           onClick={() =>
-            fetch("/api/hello", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ msg: name }),
+            postData("/api/hello", { msg: name }).then((data) => {
+              console.log(data);
+              setMsg(JSON.stringify(data, null, 2));
             })
-              .then((res) => res.json())
-              .then((data) => {
-                console.log(data);
-                setMsg(data.msg);
-              })
           }
         >
           Click to test POST api!{" "}
-        </p>
+        </button>
         <button
           onClick={() =>
             fetch("/api/get_users")
               .then((res) => res.json())
               .then((data) => {
-                console.log(data);
-                setMsg(JSON.stringify(data));
+                console.log(JSON.stringify(data, null, 2));
+                setMsg(JSON.stringify(data, null, 2));
               })
           }
         >
           Click to test db!
         </button>
+        <form
+          className="create-user-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            postData("/api/register", {
+              username: e.target.username.value,
+              password: e.target.password.value,
+            }).then((data) => {
+              console.log(data);
+            });
+          }}
+        >
+          <label htmlFor="username">Username</label>
+          <input type="text" name="username" id="username" />
+          <label htmlFor="password">Password</label>
+          <input type="password" name="password" id="password" />
+          <input type="submit" value="Submit" />
+        </form>
       </div>
     </>
   );
