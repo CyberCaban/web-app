@@ -49,7 +49,7 @@ pub fn api_get_users(db: &State<Connection>) -> Value {
     let conn = &mut *db.get();
     match users.load::<User>(conn) {
         Ok(result) => json!(result),
-        Err(_) => json!(ApiResponse::Err),
+        Err(e) => json!( e.to_string() ),
     }
 }
 
