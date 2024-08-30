@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "prebuild": "npm install",
+    "predeploy": "npm install",
+    "deploy": "vite build",
     "dev": "vite",
     "build": "vite build",
     "b-w": "vite build --watch",
