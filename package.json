@@ -1,5 +1,6 @@
 {
     "scripts": {
-        "start_deploy": "npm i && vite build ./www && cargo run --release"
+        "prestart_deploy": "npm install",
+        "start_deploy": "vite build ./www && cargo run --release"
     }
 }
