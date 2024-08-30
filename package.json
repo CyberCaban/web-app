@@ -1,0 +1,5 @@
+{
+    "scripts": {
+        "start_deploy": "vite build ./www && cargo run --release"
+    }
+}
