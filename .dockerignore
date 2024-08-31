@@ -1,0 +1,5 @@
+/target
+.env
+
+./www/dist
+./www/node_modules
