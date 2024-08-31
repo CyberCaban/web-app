@@ -1,5 +1,0 @@
-{
-  "scripts": {
-    "start_deploy": "cd ./www && npm run deploy && cd .. && cargo run --release"
-  }
-}
