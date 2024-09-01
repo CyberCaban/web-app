@@ -1,2 +1,5 @@
 /target
 .env
+
+tmp/*
+!tmp/.gitkeep

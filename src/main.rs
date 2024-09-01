@@ -6,6 +6,7 @@ mod routes;
 mod schema;
 mod services;
 mod database;
+mod errors;
 
 #[macro_use]
 extern crate rocket;

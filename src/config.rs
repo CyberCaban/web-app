@@ -1,5 +1,9 @@
 use dotenv::dotenv;
-use rocket::{figment::value::magic::RelativePathBuf, Config};
+use rocket::{
+    data::{Limits, ToByteUnit},
+    figment::value::magic::RelativePathBuf,
+    Config,
+};
 use std::env;
 
 pub fn from_env() -> Config {
@@ -11,6 +15,8 @@ pub fn from_env() -> Config {
         address: address.parse().unwrap(),
         port: port.parse().unwrap(),
         temp_dir: RelativePathBuf::from("tmp"),
+        limits: Limits::default()
+            .limit("file", 30.megabytes()),
         ..Config::default()
     };
 

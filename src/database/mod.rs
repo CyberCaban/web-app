@@ -4,7 +4,6 @@ use diesel::PgConnection;
 
 use crate::services;
 
-
 pub struct Connection(Mutex<PgConnection>);
 
 impl Connection {
@@ -12,7 +11,10 @@ impl Connection {
         Self(Mutex::new(services::connect_pg()))
     }
 
-    pub fn get(&self) -> MutexGuard<PgConnection> {
-        self.0.lock().expect("Connection error")
+    pub fn get(
+        &self,
+    ) -> Result<MutexGuard<'_, PgConnection>, std::sync::TryLockError<MutexGuard<'_, PgConnection>>>
+    {
+        self.0.try_lock()
     }
 }

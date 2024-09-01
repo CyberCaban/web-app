@@ -66,6 +66,24 @@ function App() {
           <input type="password" name="password" id="password" />
           <input type="submit" value="Submit" />
         </form>
+
+        <form
+          className="upload-form"
+          encType="multipart/form-data"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            formData.append("file", (e.target as HTMLFormElement).file.files[0]);
+            fetch("/api/uploadFile", {
+              method: "POST",
+              body: formData,
+            })
+          }}
+        >
+          <label htmlFor="file">File</label>
+          <input type="file" name="file" id="file" />
+          <input type="submit" value="Submit" />
+        </form>
       </div>
     </>
   );
