@@ -50,3 +50,9 @@
   flex-direction: column;
   gap: 0.5rem;
 }
+
+.upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
