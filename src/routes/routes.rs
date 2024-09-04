@@ -1,7 +1,7 @@
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
 use rocket::form::Form;
-use rocket::fs::TempFile;
+use rocket::fs::{NamedFile, TempFile};
 use rocket::response::content::RawHtml;
 use rocket::tokio::io::AsyncReadExt;
 use rocket::{serde::json::Json, State};
@@ -109,6 +109,14 @@ pub async fn api_upload_file(file: Form<UploadRequest<'_>>) -> Value {
     std::fs::write(format!("tmp/{}", file_name), buf).unwrap();
     json!("File uploaded")
 }
+
+#[get("/file/<file_name>")]
+pub async fn api_get_file(file_name: &str) -> Option<NamedFile> {
+    let path = std::path::PathBuf::from("tmp").join(file_name);
+
+    NamedFile::open(path).await.ok()
+}
+
 
 #[get("/toro", format = "html")]
 pub fn toro() -> RawHtml<String> {
