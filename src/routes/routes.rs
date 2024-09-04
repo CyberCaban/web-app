@@ -2,6 +2,7 @@ use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
 use rocket::form::Form;
 use rocket::fs::{NamedFile, TempFile};
+use rocket::http::{ContentType, CookieJar};
 use rocket::response::content::RawHtml;
 use rocket::tokio::io::AsyncReadExt;
 use rocket::{serde::json::Json, State};
@@ -9,10 +10,9 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::database::Connection;
-use crate::errors::{ApiError, RegisterError};
-use crate::models;
+use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models::User;
-use crate::schema;
+use crate::models::{self, UploadedFile};
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Deserialize)]
@@ -51,8 +51,14 @@ pub fn api_get_users(db: &State<Connection>) -> Value {
 }
 
 #[post("/register", format = "json", data = "<user>")]
-pub fn api_register(db: &State<Connection>, user: Json<NewUser<'_>>) -> Result<Json<User>, Value> {
+pub fn api_register(
+    db: &State<Connection>,
+    user: Json<NewUser<'_>>,
+    cookies: &CookieJar<'_>,
+) -> Result<Json<User>, Value> {
     use self::models::User;
+    use crate::schema;
+
     let mut conn = match db.get() {
         Ok(c) => c,
         Err(e) => return Err(json!(ApiError::from_error(&e))),
@@ -81,33 +87,112 @@ pub fn api_register(db: &State<Connection>, user: Json<NewUser<'_>>) -> Result<J
             {
                 return Err(ApiError::from_error(&e).to_json());
             }
+
+            cookies.add(("token", new_user.id.to_string()));
             Ok(Json(new_user))
         }
     }
 }
 
+#[post("/login", format = "json", data = "<user>")]
+pub fn api_login(
+    db: &State<Connection>,
+    user: Json<NewUser<'_>>,
+    cookies: &CookieJar<'_>,
+) -> Result<Json<User>, Value> {
+    use self::models::User;
+    let mut conn = match db.get() {
+        Ok(c) => c,
+        Err(e) => return Err(json!(ApiError::from_error(&e))),
+    };
+    match users
+        .filter(users::username.eq(user.username.to_lowercase()))
+        .first::<User>(&mut *conn)
+    {
+        Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
+        Ok(user) => {
+            if user.password != user.password {
+                Err(ApiError::new("WrongPassword", LoginError::WrongPassword).to_json())
+            } else {
+                cookies.add(("token", user.id.to_string()));
+                Ok(Json(user))
+            }
+        }
+    }
+}
+
+#[post("/logout")]
+pub fn api_logout(cookies: &CookieJar<'_>) -> Value {
+    cookies.remove("token");
+    json!("Logged out")
+}
+
 #[derive(FromForm, Debug)]
 pub struct UploadRequest<'r> {
     pub file: TempFile<'r>,
+    pub filename: &'r str,
 }
 
 #[post("/uploadFile", data = "<file>")]
-pub async fn api_upload_file(file: Form<UploadRequest<'_>>) -> Value {
-    println!("File: {:?}", file.file);
-    let file_ext = file
-        .file
-        .content_type()
-        .unwrap()
-        .extension()
-        .unwrap()
-        .as_str();
-    let file_name = format!("{}.{}", Uuid::new_v4(), file_ext);
+pub async fn api_upload_file(
+    file: Form<UploadRequest<'_>>,
+    db: &State<Connection>,
+    cookies: &CookieJar<'_>,
+) -> Result<Json<Value>, Value> {
+    use crate::models::UploadedFile as File;
+    use crate::schema::{self, files, users};
 
+    let uploader_id = cookies.get("token");
+    if uploader_id.is_none() {
+        return Err(ApiError::new("Unauthorized", "Unauthorized").to_json());
+    }
+    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
+
+    let mut conn = match db.get() {
+        Ok(c) => c,
+        Err(e) => return Err(ApiError::from_error(&e).to_json()),
+    };
+    match users
+        .filter(users::id.eq(uploader_id))
+        .first::<User>(&mut *conn)
+    {
+        Err(_) => return Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
+        Ok(_) => (),
+    }
+
+    let old_name = file.filename;
+    let file_ext = match file.file.content_type() {
+        None => "",
+        Some(mime) => {
+            let ext = mime.extension();
+            match ext {
+                None => "",
+                Some(ext) => ext.as_str(),
+            }
+        }
+    };
+    let file_id = Uuid::new_v4();
+    let file_name = format!("{}-{}.{}", file_id, old_name, file_ext);
+
+    let new_file = File {
+        id: uuid::Uuid::new_v4(),
+        name: file_name.clone(),
+        user_id: uploader_id,
+    };
+
+    if let Err(e) = diesel::insert_into(files::table)
+        .values(&new_file)
+        .execute(&mut *conn)
+    {
+        return Err(ApiError::from_error(&e).to_json());
+    }
+    
     let mut file = file.file.open().await.unwrap();
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).await.unwrap();
     std::fs::write(format!("tmp/{}", file_name), buf).unwrap();
-    json!("File uploaded")
+
+    Ok(Json("File uploaded".into()))
 }
 
 #[get("/file/<file_name>")]
@@ -116,7 +201,6 @@ pub async fn api_get_file(file_name: &str) -> Option<NamedFile> {
 
     NamedFile::open(path).await.ok()
 }
-
 
 #[get("/toro", format = "html")]
 pub fn toro() -> RawHtml<String> {

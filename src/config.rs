@@ -16,7 +16,8 @@ pub fn from_env() -> Config {
         port: port.parse().unwrap(),
         temp_dir: RelativePathBuf::from("tmp"),
         limits: Limits::default()
-            .limit("file", 30.megabytes()),
+            .limit("file", 30.megabytes())
+            .limit("data-form", 30.megabytes()),
         ..Config::default()
     };
 

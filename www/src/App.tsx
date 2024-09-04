@@ -72,16 +72,22 @@ function App() {
           encType="multipart/form-data"
           onSubmit={(e) => {
             e.preventDefault();
-            const formData = new FormData(e.target as HTMLFormElement);
-            formData.append("file", (e.target as HTMLFormElement).file.files[0]);
+            const target = e.target as HTMLFormElement;
+            const formData = new FormData(target);
+            formData.append("file", target.file.files[0]);
+            formData.append("filename", target.filename.value);
             fetch("/api/uploadFile", {
               method: "POST",
               body: formData,
             })
+              .then((res) => res.json())
+              .then((res) => console.log(res));
           }}
         >
           <label htmlFor="file">File</label>
           <input type="file" name="file" id="file" />
+          <label htmlFor="filename">Filename</label>
+          <input type="text" name="filename" id="filename" />
           <input type="submit" value="Submit" />
         </form>
       </div>

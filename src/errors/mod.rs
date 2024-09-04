@@ -54,3 +54,15 @@ impl ToString for RegisterError {
         }
     }
 }
+pub enum LoginError {
+    UserNotFound,
+    WrongPassword,
+}
+impl ToString for LoginError {
+    fn to_string(&self) -> String {
+        match self {
+            LoginError::UserNotFound => "UserNotFound".to_string(),
+            LoginError::WrongPassword => "WrongPassword".to_string(),
+        }
+    }
+}

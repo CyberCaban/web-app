@@ -1,6 +1,5 @@
-use std::sync::{Mutex, MutexGuard};
-
 use diesel::PgConnection;
+use rocket::tokio::sync::{Mutex, MutexGuard};
 
 use crate::services;
 
@@ -13,7 +12,7 @@ impl Connection {
 
     pub fn get(
         &self,
-    ) -> Result<MutexGuard<'_, PgConnection>, std::sync::TryLockError<MutexGuard<'_, PgConnection>>>
+    ) -> Result<MutexGuard<'_, PgConnection>, rocket::tokio::sync::TryLockError>
     {
         self.0.try_lock()
     }
