@@ -1,3 +1,4 @@
+use catchers::Catcher;
 use routes::AuthorizationRoutes;
 
 mod config;
@@ -7,6 +8,7 @@ mod schema;
 mod services;
 mod database;
 mod errors;
+mod catchers;
 
 #[macro_use]
 extern crate rocket;
@@ -17,6 +19,7 @@ async fn main() -> Result<(), rocket::Error> {
         .configure(config::from_env())
         .manage_db()
         .mount_static_files()
+        .mount_catchers()
         .mount_auth_routes()
         .launch()
         .await?;
