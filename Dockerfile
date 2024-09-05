@@ -23,10 +23,14 @@ RUN cd www \
     && npm run build \
     && cd ..
 
+RUN cargo install diesel_cli --no-default-features --features postgres
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN diesel --help
+
 RUN cargo build --release
 
 ENV ROCKET_ADDRESS=0.0.0.0
 ENV PORT=5000
 EXPOSE 5000
 
-CMD cargo run --release
+CMD diesel migration run && cargo run --release
