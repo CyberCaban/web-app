@@ -7,7 +7,7 @@ edition = "2021"
 diesel = { version = "2.2.3", features = ["postgres", "uuid"] }
 diesel_migrations = "2.2.0"
 dotenv = "0.15.0"
-rocket = { version = "0.5.1", features = ["json", "secrets"] } # "0.5.1"
+rocket = { version = "0.5.1", features = ["json"] } # "0.5.1"
 serde = "1.0.209"
 serde_json = "1.0.127"
 uuid = {version = "1.10.0", features = ["v4", "serde"] }

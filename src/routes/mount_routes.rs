@@ -12,6 +12,8 @@ impl AuthorizationRoutes for Rocket<Build> {
             routes::api_register,
             routes::api_upload_file,
             routes::api_get_file,
+            routes::api_delete_file,
+            routes::api_get_files,
             routes::api_login,
             routes::api_logout,
             routes::toro

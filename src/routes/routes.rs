@@ -130,17 +130,17 @@ pub fn api_logout(cookies: &CookieJar<'_>) -> Value {
 #[derive(FromForm, Debug)]
 pub struct UploadRequest<'r> {
     pub file: TempFile<'r>,
-    pub filename: &'r str,
+    pub filename: Option<&'r str>,
 }
 
-#[post("/uploadFile", data = "<file>")]
+#[post("/file/create", data = "<file>")]
 pub async fn api_upload_file(
     file: Form<UploadRequest<'_>>,
     db: &State<Connection>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Value> {
     use crate::models::UploadedFile as File;
-    use crate::schema::{self, files, users};
+    use crate::schema::{files, users};
 
     let uploader_id = cookies.get("token");
     if uploader_id.is_none() {
@@ -160,7 +160,7 @@ pub async fn api_upload_file(
         Ok(_) => (),
     }
 
-    let old_name = file.filename;
+    let old_name = file.filename.unwrap_or("unnamed");
     let file_ext = match file.file.content_type() {
         None => "",
         Some(mime) => {
@@ -186,7 +186,7 @@ pub async fn api_upload_file(
     {
         return Err(ApiError::from_error(&e).to_json());
     }
-    
+
     let mut file = file.file.open().await.unwrap();
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).await.unwrap();
@@ -200,6 +200,61 @@ pub async fn api_get_file(file_name: &str) -> Option<NamedFile> {
     let path = std::path::PathBuf::from("tmp").join(file_name);
 
     NamedFile::open(path).await.ok()
+}
+
+#[delete("/file/<file_name>")]
+pub fn api_delete_file(file_name: &str, db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
+    use crate::models::UploadedFile as File;
+    use crate::schema::{files as files_schema, files::dsl::files};
+
+    let uploader_id = cookies.get("token");
+    if uploader_id.is_none() {
+        return ApiError::new("Unauthorized", "Unauthorized").to_json();
+    }
+    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
+
+    let mut conn = match db.get() {
+        Ok(c) => c,
+        Err(e) => return ApiError::from_error(&e).to_json(),
+    };
+    match files
+        .filter(files_schema::name.eq(file_name))
+        .filter(files_schema::user_id.eq(uploader_id))
+        .first::<File>(&mut *conn)
+    {
+        Ok(f) => {
+            if let Err(e) = diesel::delete(files_schema::table.filter(files_schema::id.eq(f.id)))
+                .execute(&mut *conn)
+            {
+                return ApiError::from_error(&e).to_json();
+            }
+            std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+            json!("File deleted")
+        }
+        Err(_) => json!("File not found"),
+    }
+}
+
+#[get("/files")]
+pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
+    use crate::models::UploadedFile as File;
+    use crate::schema::files as files_schema;
+    let uploader_id = cookies.get("token");
+    if uploader_id.is_none() {
+        return ApiError::new("Unauthorized", "Unauthorized").to_json();
+    }
+    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
+    let mut conn = match db.get() {
+        Ok(c) => c,
+        Err(e) => return ApiError::from_error(&e).to_json(),
+    };
+    match files_schema::table
+        .filter(files_schema::user_id.eq(uploader_id))
+        .load::<File>(&mut *conn)
+    {
+        Ok(files) => json!(files.into_iter().map(|f| f.name).collect::<Vec<String>>()),
+        Err(e) => ApiError::from_error(&e).to_json(),
+    }
 }
 
 #[get("/toro", format = "html")]

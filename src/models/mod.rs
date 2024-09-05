@@ -9,7 +9,7 @@ pub struct User {
     pub password: String,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::files)]
 pub struct UploadedFile {
     pub id: uuid::Uuid,
