@@ -4,38 +4,14 @@ import { getData, postData } from "./utils/utils";
 
 function App() {
   const [msg, setMsg] = useState("");
-  const [name, setName] = useState("");
+  const [files, setFiles] = useState([]);
+  const [imgSrc, setImgSrc] = useState("");
 
   return (
     <>
       <div className="card">
         <pre style={{ textAlign: "left" }}>{msg}</pre>
-        <button
-          onClick={() =>
-            getData("/api/hello").then((data) => {
-              console.log(data);
-              setMsg(JSON.stringify(data, null, 2));
-            })
-          }
-        >
-          Click to test GET api!
-        </button>
-        <input
-          type="text"
-          name="name"
-          id="name"
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button
-          onClick={() =>
-            postData("/api/hello", { msg: name }).then((data) => {
-              console.log(data);
-              setMsg(JSON.stringify(data, null, 2));
-            })
-          }
-        >
-          Click to test POST api!{" "}
-        </button>
+
         <button
           onClick={() =>
             fetch("/api/get_users")
@@ -48,24 +24,88 @@ function App() {
         >
           Click to test db!
         </button>
-        <form
-          className="create-user-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            postData("/api/register", {
-              username: e.target.username.value,
-              password: e.target.password.value,
-            }).then((data) => {
-              console.log(data);
-            });
-          }}
+
+        <div className="flex flex-row gap-2">
+          <form
+            className="create-user-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              postData("/api/register", {
+                username: e.target.username.value,
+                password: e.target.password.value,
+              }).then((data) => {
+                console.log(data);
+              });
+            }}
+          >
+            <h1>Register</h1>
+            <label htmlFor="username">Username</label>
+            <input type="text" name="username" id="username" />
+            <label htmlFor="password">Password</label>
+            <input type="password" name="password" id="password" />
+          </form>
+          <form
+            className="flex flex-col border-white border p-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              postData("/api/login", {
+                username: e.target.login_username.value,
+                password: e.target.login_password.value,
+              }).then((data) => {
+                console.log(data);
+              });
+            }}
+          >
+            <h1>Login</h1>
+            <label htmlFor="login_username">Username</label>
+            <input type="text" name="login_username" id="login_username" />
+            <label htmlFor="login_password">Password</label>
+            <input type="password" name="login_password" id="login_password" />
+            <button className="hidden" type="submit">Login</button>
+          </form>
+        </div>
+        <button onClick={() => postData("/api/logout", {})}>Logout</button>
+
+        {files &&
+          files.map((file) => (
+            <div key={file}>
+              <a href={`/api/file/${file}`}>{file}</a>
+              <button
+              className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md"
+                onClick={() => {
+                  fetch(`/api/file/${file}`, { method: "DELETE" });
+                  getData("/api/files")
+                    .then((res) => {
+                      if (res.error_msg) {
+                        throw new Error(res.error_msg);
+                      }
+                      console.log(res);
+                      setMsg(JSON.stringify(res, null, 2));
+                      setFiles(res);
+                    })
+                    .catch((err) => console.error(err));
+                }}
+              >
+                delete
+              </button>
+            </div>
+          ))}
+        <button
+          onClick={() =>
+            getData("/api/files")
+              .then((res) => {
+                if (res.error_msg) {
+                  throw new Error(res.error_msg);
+                }
+                console.log(res);
+                setMsg(JSON.stringify(res, null, 2));
+                setFiles(res);
+              })
+              .catch((err) => console.error(err))
+          }
         >
-          <label htmlFor="username">Username</label>
-          <input type="text" name="username" id="username" />
-          <label htmlFor="password">Password</label>
-          <input type="password" name="password" id="password" />
-          <input type="submit" value="Submit" />
-        </form>
+          Get all files
+        </button>
 
         <form
           className="upload-form"
@@ -76,7 +116,7 @@ function App() {
             const formData = new FormData(target);
             formData.append("file", target.file.files[0]);
             formData.append("filename", target.filename.value);
-            fetch("/api/uploadFile", {
+            fetch("/api/file/create", {
               method: "POST",
               body: formData,
             })
