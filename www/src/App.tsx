@@ -43,6 +43,7 @@ function App() {
             <input type="text" name="username" id="username" />
             <label htmlFor="password">Password</label>
             <input type="password" name="password" id="password" />
+            <button className="hidden" type="submit">Register</button>
           </form>
           <form
             className="flex flex-col border-white border p-5"

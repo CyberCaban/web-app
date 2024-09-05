@@ -110,12 +110,12 @@ pub fn api_login(
         .first::<User>(&mut *conn)
     {
         Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
-        Ok(user) => {
-            if user.password != user.password {
+        Ok(usr) => {
+            if usr.password != user.password {
                 Err(ApiError::new("WrongPassword", LoginError::WrongPassword).to_json())
             } else {
-                cookies.add(("token", user.id.to_string()));
-                Ok(Json(user))
+                cookies.add(("token", usr.id.to_string()));
+                Ok(Json(usr))
             }
         }
     }
