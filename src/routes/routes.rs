@@ -130,7 +130,7 @@ pub fn api_logout(cookies: &CookieJar<'_>) -> Value {
 #[derive(FromForm, Debug)]
 pub struct UploadRequest<'r> {
     pub file: TempFile<'r>,
-    pub filename: Option<&'r str>,
+    pub filename: &'r str,
 }
 
 #[post("/file/create", data = "<file>")]
@@ -160,7 +160,10 @@ pub async fn api_upload_file(
         Ok(_) => (),
     }
 
-    let old_name = file.filename.unwrap_or("unnamed");
+    let old_name = match file.filename {
+        "" => "unnamed",
+        name => name,
+    };
     let file_ext = match file.file.content_type() {
         None => "",
         Some(mime) => {
