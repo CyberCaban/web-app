@@ -1,7 +1,7 @@
 use rocket::{fs::FileServer, Build, Rocket};
 use crate::database::Connection as Conn;
 
-use super::{routes, AuthorizationRoutes};
+use super::{file_routes, routes, AuthorizationRoutes};
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
@@ -10,10 +10,10 @@ impl AuthorizationRoutes for Rocket<Build> {
             routes::api_hello_post,
             routes::api_get_users,
             routes::api_register,
-            routes::api_upload_file,
-            routes::api_get_file,
-            routes::api_delete_file,
-            routes::api_get_files,
+            file_routes::api_upload_file,
+            file_routes::api_get_file,
+            file_routes::api_delete_file,
+            file_routes::api_get_files,
             routes::api_login,
             routes::api_logout,
             routes::toro

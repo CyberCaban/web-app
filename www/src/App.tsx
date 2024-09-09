@@ -43,7 +43,9 @@ function App() {
             <input type="text" name="username" id="username" />
             <label htmlFor="password">Password</label>
             <input type="password" name="password" id="password" />
-            <button className="hidden" type="submit">Register</button>
+            <button className="hidden" type="submit">
+              Register
+            </button>
           </form>
           <form
             className="flex flex-col border-white border p-5"
@@ -62,7 +64,9 @@ function App() {
             <input type="text" name="login_username" id="login_username" />
             <label htmlFor="login_password">Password</label>
             <input type="password" name="login_password" id="login_password" />
-            <button className="hidden" type="submit">Login</button>
+            <button className="hidden" type="submit">
+              Login
+            </button>
           </form>
         </div>
         <button onClick={() => postData("/api/logout", {})}>Logout</button>
@@ -72,7 +76,7 @@ function App() {
             <div key={file}>
               <a href={`/api/file/${file}`}>{file}</a>
               <button
-              className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md"
+                className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md"
                 onClick={() => {
                   fetch(`/api/file/${file}`, { method: "DELETE" });
                   getData("/api/files")
@@ -117,6 +121,7 @@ function App() {
             const formData = new FormData(target);
             formData.append("file", target.file.files[0]);
             formData.append("filename", target.filename.value);
+            formData.append("is_private", target.is_private.checked);
             fetch("/api/file/create", {
               method: "POST",
               body: formData,
@@ -129,6 +134,13 @@ function App() {
           <input type="file" name="file" id="file" />
           <label htmlFor="filename">Filename</label>
           <input type="text" name="filename" id="filename" />
+          <label htmlFor="is_private">Private</label>
+          <input
+            type="checkbox"
+            name="is_private"
+            id="is_private"
+            defaultChecked={true}
+          />
           <input type="submit" value="Submit" />
         </form>
       </div>
