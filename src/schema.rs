@@ -6,6 +6,7 @@ diesel::table! {
         #[max_length = 255]
         name -> Varchar,
         user_id -> Uuid,
+        public -> Bool,
     }
 }
 

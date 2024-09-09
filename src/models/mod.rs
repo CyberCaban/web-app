@@ -15,4 +15,5 @@ pub struct UploadedFile {
     pub id: uuid::Uuid,
     pub name: String,
     pub user_id: uuid::Uuid,
+    pub public: bool,
 }

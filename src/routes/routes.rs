@@ -181,6 +181,7 @@ pub async fn api_upload_file(
         id: uuid::Uuid::new_v4(),
         name: file_name.clone(),
         user_id: uploader_id,
+        public: false,
     };
 
     if let Err(e) = diesel::insert_into(files::table)
