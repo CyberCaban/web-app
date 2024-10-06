@@ -1,18 +1,14 @@
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
-use rocket::form::Form;
-use rocket::fs::{NamedFile, TempFile};
-use rocket::http::{ContentType, CookieJar};
+use rocket::http::CookieJar;
 use rocket::response::content::RawHtml;
-use rocket::tokio::io::AsyncReadExt;
 use rocket::{serde::json::Json, State};
 use serde_json::{json, Value};
-use uuid::Uuid;
 
 use crate::database::Connection;
 use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models::User;
-use crate::models::{self, UploadedFile};
+use crate::models;
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Deserialize)]
@@ -105,9 +101,11 @@ pub fn api_login(
         Ok(c) => c,
         Err(e) => return Err(json!(ApiError::from_error(&e))),
     };
-    match users
+    let usrs = users
         .filter(users::username.eq(user.username.to_lowercase()))
-        .first::<User>(&mut *conn)
+        .first::<User>(&mut *conn);
+    println!("{:?}", &usrs);
+    match usrs
     {
         Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
         Ok(usr) => {

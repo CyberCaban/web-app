@@ -12,7 +12,7 @@ function App() {
       <div className="card">
         <pre style={{ textAlign: "left" }}>{msg}</pre>
 
-        <button
+        {/* <button
           onClick={() =>
             fetch("/api/get_users")
               .then((res) => res.json())
@@ -23,7 +23,7 @@ function App() {
           }
         >
           Click to test db!
-        </button>
+        </button> */}
 
         <div className="flex flex-row gap-2">
           <form
