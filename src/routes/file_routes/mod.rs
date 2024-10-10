@@ -182,6 +182,7 @@ pub fn api_delete_file(file_name: &str, db: &State<Connection>, cookies: &Cookie
 pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
     use crate::models::UploadedFile as File;
     use crate::schema::files as files_schema;
+    use diesel::BoolExpressionMethods;
     let mut conn = connect_db!(db);
     let uploader_id = cookies.get("token");
     if uploader_id.is_none() {
@@ -195,7 +196,11 @@ pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
     }
     let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
     match files_schema::table
-        .filter(files_schema::user_id.eq(uploader_id))
+        .filter(
+            files_schema::private
+                .eq(false)
+                .or(files_schema::user_id.eq(uploader_id)),
+        )
         .load::<File>(&mut *conn)
     {
         Ok(files) => json!(files.into_iter().map(|f| f.name).collect::<Vec<String>>()),
