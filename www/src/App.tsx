@@ -8,13 +8,51 @@ function App() {
   const [msg, setMsg] = useState("");
   const [files, setFiles] = useState([]);
   const [imgSrc, setImgSrc] = useState("");
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (!ws) return;
+    ws.onmessage = (event) => {
+      console.log("onmessage", event);
+      setMsg(event.data);
+    };
+    ws.onerror = (event) => {
+      console.log("onerror", event);
+    };
+    ws.onclose = (event) => {
+      console.log("onclose", event);
+    };
+
+    return () => {
+      if (ws) ws.close();
+    };
+  }, [ws]);
 
   useEffect(() => {}, [window.delbnt]);
+
+  function startWS() {
+    setWs(new WebSocket("ws://localhost:5000/api/ws"));
+  }
+  function testWS(msg: string) {
+    if (ws) {
+      let i = 0;
+      const interval = setInterval(() => {
+        ws.send(JSON.stringify({ msg: `${i}: ${msg}` }));
+        i++;
+        if (i > 5) {
+          clearInterval(interval);
+        }
+      }, 1000);
+    }
+  }
 
   return (
     <>
       <div className="card">
-        {/* <pre style={{ textAlign: "left" }}>{msg}</pre> */}
+        <pre style={{ textAlign: "left" }}>{msg}</pre>
+        <button onClick={startWS}>Start WS</button>
+        <button onClick={() => testWS("darowa")}>Test WS</button>
+
         <div className="flex flex-row gap-2">
           <form
             className="create-user-form"

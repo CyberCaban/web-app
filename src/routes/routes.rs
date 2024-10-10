@@ -1,14 +1,16 @@
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
+use rocket::futures::SinkExt;
 use rocket::http::CookieJar;
 use rocket::response::content::RawHtml;
 use rocket::{serde::json::Json, State};
 use serde_json::{json, Value};
+use ws::Message;
 
 use crate::database::Connection;
 use crate::errors::{ApiError, LoginError, RegisterError};
-use crate::models::User;
 use crate::models;
+use crate::models::User;
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Deserialize)]
@@ -105,8 +107,7 @@ pub fn api_login(
         .filter(users::username.eq(user.username))
         .first::<User>(&mut *conn);
     println!("{:?}", &usrs);
-    match usrs
-    {
+    match usrs {
         Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
         Ok(usr) => {
             if usr.password != user.password {
@@ -123,6 +124,30 @@ pub fn api_login(
 pub fn api_logout(cookies: &CookieJar<'_>) -> Value {
     cookies.remove("token");
     json!("Logged out")
+}
+
+#[get("/ws")]
+pub fn test_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
+    ws::Stream! {
+        ws => {
+            for await msg in ws {
+                let msg_text: Message = match msg {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        continue;
+                    },
+                };
+                let data = msg_text.clone().into_data();
+                for i in data {
+                    print!("{} ", i);
+                }
+                println!("");
+                let out = format!("Hello, {}!", msg_text.into_text().unwrap());
+                yield out.into();
+            }
+        }
+    }
 }
 
 #[get("/toro", format = "html")]

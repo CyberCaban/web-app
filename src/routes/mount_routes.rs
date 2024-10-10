@@ -16,7 +16,8 @@ impl AuthorizationRoutes for Rocket<Build> {
             file_routes::api_get_files,
             routes::api_login,
             routes::api_logout,
-            routes::toro
+            routes::toro,
+            routes::test_ws,
         ])
     }
 
