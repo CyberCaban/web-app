@@ -102,7 +102,7 @@ pub fn api_login(
         Err(e) => return Err(json!(ApiError::from_error(&e))),
     };
     let usrs = users
-        .filter(users::username.eq(user.username.to_lowercase()))
+        .filter(users::username.eq(user.username))
         .first::<User>(&mut *conn);
     println!("{:?}", &usrs);
     match usrs

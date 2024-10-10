@@ -10,10 +10,17 @@ impl Connection {
         Self(Mutex::new(services::connect_pg()))
     }
 
-    pub fn get(
-        &self,
-    ) -> Result<MutexGuard<'_, PgConnection>, rocket::tokio::sync::TryLockError>
-    {
+    pub fn get(&self) -> Result<MutexGuard<'_, PgConnection>, rocket::tokio::sync::TryLockError> {
         self.0.try_lock()
     }
+}
+
+#[macro_export]
+macro_rules! connect_db {
+    ($db:expr) => {
+        match $db.get() {
+            Ok(c) => c,
+            Err(e) => return ApiError::from_error(&e).to_json(),
+        }
+    };
 }

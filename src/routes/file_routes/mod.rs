@@ -1,10 +1,12 @@
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use rocket::fs::NamedFile;
+use rocket::http::hyper::server::conn;
 use rocket::tokio::io::AsyncReadExt;
 use rocket::{form::Form, fs::TempFile, http::CookieJar, serde::json::Json, State};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use crate::connect_db;
 use crate::errors::LoginError;
 use crate::schema::users::dsl::*;
 use crate::{database::Connection, errors::ApiError, models::User};
@@ -113,13 +115,13 @@ pub async fn api_get_file(
         Err(e) => {
             eprintln!("Failed to connect to database: {}", e);
             return None;
-        },
+        }
     };
-    
+
     match files
-    .filter(name.eq(file_name))
-    .filter(user_id.eq(uploader_id))
-    .first::<File>(&mut *conn)
+        .filter(name.eq(file_name))
+        .filter(user_id.eq(uploader_id))
+        .first::<File>(&mut *conn)
     {
         Ok(f) => {
             let path = if f.private {
@@ -128,13 +130,13 @@ pub async fn api_get_file(
                 format!("tmp/{}", file_name)
             };
             NamedFile::open(path).await.ok()
-        },
+        }
         Err(e) => {
             println!("Uploader ID: {}", uploader_id);
             println!("File name: {}", file_name);
             eprintln!("Failed to get file: {}", e);
             None
-        },
+        }
     }
 }
 
@@ -149,10 +151,7 @@ pub fn api_delete_file(file_name: &str, db: &State<Connection>, cookies: &Cookie
     }
     let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
 
-    let mut conn = match db.get() {
-        Ok(c) => c,
-        Err(e) => return ApiError::from_error(&e).to_json(),
-    };
+    let mut conn = connect_db!(db);
     match files
         .filter(files_schema::name.eq(file_name))
         .filter(files_schema::user_id.eq(uploader_id))
@@ -164,13 +163,15 @@ pub fn api_delete_file(file_name: &str, db: &State<Connection>, cookies: &Cookie
             {
                 return ApiError::from_error(&e).to_json();
             }
-             
+
             let path = if f.private {
                 format!("tmp/{}/{}", uploader_id, file_name)
             } else {
                 format!("tmp/{}", file_name)
             };
-            std::fs::remove_file(path).unwrap();
+            if let Err(_) = std::fs::remove_file(path) {
+                return json!("File not found");
+            }
             json!("File deleted")
         }
         Err(_) => json!("File not found"),
@@ -181,15 +182,18 @@ pub fn api_delete_file(file_name: &str, db: &State<Connection>, cookies: &Cookie
 pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
     use crate::models::UploadedFile as File;
     use crate::schema::files as files_schema;
+    let mut conn = connect_db!(db);
     let uploader_id = cookies.get("token");
     if uploader_id.is_none() {
-        return ApiError::new("Unauthorized", "Unauthorized").to_json();
+        match files_schema::table
+            .filter(files_schema::private.eq(false))
+            .load::<File>(&mut *conn)
+        {
+            Ok(files) => return json!(files.into_iter().map(|f| f.name).collect::<Vec<String>>()),
+            Err(e) => return ApiError::from_error(&e).to_json(),
+        }
     }
     let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
-    let mut conn = match db.get() {
-        Ok(c) => c,
-        Err(e) => return ApiError::from_error(&e).to_json(),
-    };
     match files_schema::table
         .filter(files_schema::user_id.eq(uploader_id))
         .load::<File>(&mut *conn)

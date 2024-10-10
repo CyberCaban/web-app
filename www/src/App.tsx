@@ -1,30 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 import { getData, postData } from "./utils/utils";
+
+window.delbnt = false;
 
 function App() {
   const [msg, setMsg] = useState("");
   const [files, setFiles] = useState([]);
   const [imgSrc, setImgSrc] = useState("");
 
+  useEffect(() => {}, [window.delbnt]);
+
   return (
     <>
       <div className="card">
-        <pre style={{ textAlign: "left" }}>{msg}</pre>
-
-        {/* <button
-          onClick={() =>
-            fetch("/api/get_users")
-              .then((res) => res.json())
-              .then((data) => {
-                console.log(JSON.stringify(data, null, 2));
-                setMsg(JSON.stringify(data, null, 2));
-              })
-          }
-        >
-          Click to test db!
-        </button> */}
-
+        {/* <pre style={{ textAlign: "left" }}>{msg}</pre> */}
         <div className="flex flex-row gap-2">
           <form
             className="create-user-form"
@@ -43,12 +33,10 @@ function App() {
             <input type="text" name="username" id="username" />
             <label htmlFor="password">Password</label>
             <input type="password" name="password" id="password" />
-            <button className="hidden" type="submit">
-              Register
-            </button>
+            <button type="submit">Register</button>
           </form>
           <form
-            className="flex flex-col border-white border p-5"
+            className="flex flex-col p-5"
             onSubmit={(e) => {
               e.preventDefault();
               postData("/api/login", {
@@ -64,9 +52,7 @@ function App() {
             <input type="text" name="login_username" id="login_username" />
             <label htmlFor="login_password">Password</label>
             <input type="password" name="login_password" id="login_password" />
-            <button className="hidden" type="submit">
-              Login
-            </button>
+            <button type="submit">Login</button>
           </form>
         </div>
         <button onClick={() => postData("/api/logout", {})}>Logout</button>
@@ -75,24 +61,26 @@ function App() {
           files.map((file) => (
             <div key={file}>
               <a href={`/api/file/${file}`}>{file}</a>
-              <button
-                className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md"
-                onClick={() => {
-                  fetch(`/api/file/${file}`, { method: "DELETE" });
-                  getData("/api/files")
-                    .then((res) => {
-                      if (res.error_msg) {
-                        throw new Error(res.error_msg);
-                      }
-                      console.log(res);
-                      setMsg(JSON.stringify(res, null, 2));
-                      setFiles(res);
-                    })
-                    .catch((err) => console.error(err));
-                }}
-              >
-                delete
-              </button>
+              {window.delbnt && (
+                <button
+                  className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md"
+                  onClick={() => {
+                    fetch(`/api/file/${file}`, { method: "DELETE" });
+                    getData("/api/files")
+                      .then((res) => {
+                        if (res.error_msg) {
+                          throw new Error(res.error_msg);
+                        }
+                        console.log(res);
+                        setMsg(JSON.stringify(res, null, 2));
+                        setFiles(res);
+                      })
+                      .catch((err) => console.error(err));
+                  }}
+                >
+                  delete
+                </button>
+              )}
             </div>
           ))}
         <button
