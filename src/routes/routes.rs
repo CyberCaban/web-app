@@ -150,6 +150,17 @@ pub fn test_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
     }
 }
 
+#[get("/stream/ws")]
+pub fn stream_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
+    ws::Stream! {
+        ws => {
+            for await msg in ws {
+                yield msg?;
+            }
+        }
+    }
+}
+
 #[get("/toro", format = "html")]
 pub fn toro() -> RawHtml<String> {
     let toro: &str = "

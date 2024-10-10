@@ -193,7 +193,13 @@ pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
             Err(e) => return ApiError::from_error(&e).to_json(),
         }
     }
-    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
+    let uploader_id = match uploader_id {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => return ApiError::new("InvalidToken", "Invalid token").to_json(),
+        },
+        None => return ApiError::new("Unauthorized", "Unauthorized").to_json(),
+    };
     match files_schema::table
         .filter(files_schema::user_id.eq(uploader_id))
         .load::<File>(&mut *conn)

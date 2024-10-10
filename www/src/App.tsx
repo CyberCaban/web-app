@@ -1,20 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { getData, postData } from "./utils/utils";
 
 window.delbnt = false;
+const MIME_TYPE = 'video/webm; codecs="vp8, opus"';
 
 function App() {
   const [msg, setMsg] = useState("");
   const [files, setFiles] = useState([]);
   const [imgSrc, setImgSrc] = useState("");
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [isWatching, setIsWatcing] = useState(false);
+  const video = useRef<HTMLVideoElement>(null);
+  const mediaSrc = useRef<MediaSource | null>(null);
+  const mediaRec = useRef<MediaRecorder | null>(null);
 
   useEffect(() => {
     if (!ws) return;
     ws.onmessage = (event) => {
-      console.log("onmessage", event);
-      setMsg(event.data);
+      // console.log("onmessage", event);
     };
     ws.onerror = (event) => {
       console.log("onerror", event);
@@ -25,13 +30,111 @@ function App() {
 
     return () => {
       if (ws) ws.close();
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
     };
   }, [ws]);
 
   useEffect(() => {}, [window.delbnt]);
 
+  useEffect(() => {
+    if (!isStreaming || !ws) return;
+    async function streamWS() {
+      console.log(window.navigator);
+
+      const isVideoDevices = await navigator.mediaDevices
+        .enumerateDevices()
+        .then((dev) => dev.some((d) => d.kind === "videoinput"));
+
+      if (!isVideoDevices) {
+        console.log("No video devices found");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      });
+      const mediaRecorder = (mediaRec.current = new MediaRecorder(stream, {
+        mimeType: MIME_TYPE,
+      }));
+      mediaRecorder.addEventListener("dataavailable", onDataAvailable);
+      mediaRecorder.start(2000);
+    }
+    function onDataAvailable(event) {
+      if (event.data && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(event.data);
+      }
+    }
+    streamWS();
+    return () => {
+      if (mediaRec.current) {
+        mediaRec.current.removeEventListener("dataavailable", onDataAvailable);
+      }
+    };
+  }, [isStreaming, ws]);
+
+  useEffect(() => {
+    if (!isWatching || !ws || !video.current) return;
+    const vid = video.current;
+    const mediaSource = (mediaSrc.current = new MediaSource());
+    // mediaSource.addEventListener("sourceclose", onSourceClose);
+    // mediaSource.addEventListener("error", onSourceError);
+    mediaSource.addEventListener("sourceopen", onSourceOpen);
+    const objURL = URL.createObjectURL(mediaSource);
+    vid.src = objURL;
+    vid?.play();
+
+    function onSourceOpen() {
+      if (!ws || !mediaSrc.current || !video.current) return;
+      const mediaSource = mediaSrc.current;
+      console.log("isTypeSupported", mediaSource);
+
+      const sourceBuffer = mediaSource.addSourceBuffer(MIME_TYPE);
+      ws.onmessage = (event) => {
+        const arrayU8 = new Uint8Array(event.data);
+        console.log(arrayU8.length);
+
+        if (mediaSource.readyState === "open" && !sourceBuffer.updating) {
+          sourceBuffer.appendBuffer(arrayU8);
+        } else {
+          ws.close();
+          console.log("mediaSource.readyState", mediaSource.readyState);
+        }
+      };
+
+      sourceBuffer.addEventListener("updateend", (e) => {
+        // console.log("updateend", e);
+      });
+
+      sourceBuffer.addEventListener("error", (e) => {
+        console.log("error sourceBuffer", e);
+      });
+    }
+    function onSourceClose() {
+      console.log("onSourceClose");
+    }
+    function onSourceError(e) {
+      console.log("onSourceError", e);
+    }
+    return () => {
+      if (mediaSrc.current) {
+        mediaSrc.current.removeEventListener("sourceclose", onSourceClose);
+        mediaSrc.current.removeEventListener("error", onSourceError);
+        mediaSrc.current.removeEventListener("sourceopen", onSourceOpen);
+      }
+    };
+  }, [isWatching, ws]);
+
   function startWS() {
-    setWs(new WebSocket("ws://localhost:5000/api/ws"));
+    const s = new WebSocket("ws://localhost:5000/api/stream/ws");
+    s.binaryType = "arraybuffer";
+    setWs(s);
   }
   function testWS(msg: string) {
     if (ws) {
@@ -52,6 +155,13 @@ function App() {
         <pre style={{ textAlign: "left" }}>{msg}</pre>
         <button onClick={startWS}>Start WS</button>
         <button onClick={() => testWS("darowa")}>Test WS</button>
+        <button onClick={() => setIsStreaming(!isStreaming)}>Stream WS</button>
+        <button onClick={() => setIsWatcing(!isWatching)}>
+          Watch WS Stream
+        </button>
+        <video src="" id="video" ref={video} autoPlay controls></video>
+
+        <button onClick={() => video.current?.play()}>Play</button>
 
         <div className="flex flex-row gap-2">
           <form

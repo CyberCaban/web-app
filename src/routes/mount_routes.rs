@@ -1,4 +1,4 @@
-use rocket::{fs::FileServer, Build, Rocket};
+use rocket::{fs::FileServer, route, Build, Rocket};
 use crate::database::Connection as Conn;
 
 use super::{file_routes, routes, AuthorizationRoutes};
@@ -18,6 +18,7 @@ impl AuthorizationRoutes for Rocket<Build> {
             routes::api_logout,
             routes::toro,
             routes::test_ws,
+            routes::stream_ws,
         ])
     }
 
