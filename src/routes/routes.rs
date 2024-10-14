@@ -151,14 +151,16 @@ pub fn test_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
 }
 
 #[get("/stream/ws")]
-pub fn stream_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
-    ws::Stream! {
-        ws => {
-            for await msg in ws {
-                yield msg?;
+pub fn stream_ws(ws: ws::WebSocket) -> ws::Channel<'static> {
+    use rocket::futures::StreamExt;
+    ws.channel(move |mut stream| {
+        Box::pin(async move {
+            while let Some(msg) = stream.next().await {
+                let _ = stream.send(msg?).await;
             }
-        }
-    }
+            Ok(())
+        })
+    })
 }
 
 #[get("/toro", format = "html")]

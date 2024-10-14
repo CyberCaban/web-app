@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { getData, postData } from "./utils/utils";
+import VideoStream from "./components/VideoStream";
 
 window.delbnt = false;
 const MIME_TYPE = 'video/webm; codecs="vp8, opus"';
@@ -16,30 +17,29 @@ function App() {
   const mediaSrc = useRef<MediaSource | null>(null);
   const mediaRec = useRef<MediaRecorder | null>(null);
 
+  useEffect(() => {}, [window.delbnt]);
   useEffect(() => {
     if (!ws) return;
-    ws.onmessage = (event) => {
-      // console.log("onmessage", event);
-    };
+    // ws.onmessage = (event) => {
+    //   // console.log("onmessage", event);
+    // };
     ws.onerror = (event) => {
       console.log("onerror", event);
     };
     ws.onclose = (event) => {
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
       console.log("onclose", event);
     };
 
     return () => {
       if (ws) ws.close();
-      ws.onclose = null;
-      ws.onerror = null;
-      ws.onmessage = null;
     };
   }, [ws]);
 
-  useEffect(() => {}, [window.delbnt]);
-
   useEffect(() => {
-    if (!isStreaming || !ws) return;
+    if (!isStreaming) return;
     async function streamWS() {
       console.log(window.navigator);
 
@@ -52,7 +52,7 @@ function App() {
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: {
           echoCancellation: true,
@@ -66,7 +66,8 @@ function App() {
       mediaRecorder.addEventListener("dataavailable", onDataAvailable);
       mediaRecorder.start(2000);
     }
-    function onDataAvailable(event) {
+    function onDataAvailable(event: BlobEvent) {
+      console.log("onDataAvailable");
       if (event.data && ws && ws.readyState === WebSocket.OPEN) {
         ws.send(event.data);
       }
@@ -93,20 +94,12 @@ function App() {
     function onSourceOpen() {
       if (!ws || !mediaSrc.current || !video.current) return;
       const mediaSource = mediaSrc.current;
-      console.log("isTypeSupported", mediaSource);
+      console.log("isTypeSupported", MediaSource.isTypeSupported(MIME_TYPE));
 
       const sourceBuffer = mediaSource.addSourceBuffer(MIME_TYPE);
-      ws.onmessage = (event) => {
-        const arrayU8 = new Uint8Array(event.data);
-        console.log(arrayU8.length);
-
-        if (mediaSource.readyState === "open" && !sourceBuffer.updating) {
-          sourceBuffer.appendBuffer(arrayU8);
-        } else {
-          ws.close();
-          console.log("mediaSource.readyState", mediaSource.readyState);
-        }
-      };
+      ws.addEventListener("message", (event) => {
+        onWSMessage(event, sourceBuffer, mediaSource);
+      });
 
       sourceBuffer.addEventListener("updateend", (e) => {
         // console.log("updateend", e);
@@ -122,12 +115,24 @@ function App() {
     function onSourceError(e) {
       console.log("onSourceError", e);
     }
+    function onWSMessage(event, sourceBuf, mediaSource) {
+      console.log("onWSMessage", event);
+      
+      const arrayU8 = new Uint8Array(event.data);
+      if (mediaSource.readyState === "open" && !sourceBuf.updating) {
+        sourceBuf.appendBuffer(arrayU8);
+      } else {
+        // if (ws) ws.close();
+        console.log("mediaSource.readyState", mediaSource.readyState);
+      }
+    }
     return () => {
       if (mediaSrc.current) {
         mediaSrc.current.removeEventListener("sourceclose", onSourceClose);
         mediaSrc.current.removeEventListener("error", onSourceError);
         mediaSrc.current.removeEventListener("sourceopen", onSourceOpen);
       }
+      if (ws) ws.close();
     };
   }, [isWatching, ws]);
 
@@ -136,32 +141,19 @@ function App() {
     s.binaryType = "arraybuffer";
     setWs(s);
   }
-  function testWS(msg: string) {
-    if (ws) {
-      let i = 0;
-      const interval = setInterval(() => {
-        ws.send(JSON.stringify({ msg: `${i}: ${msg}` }));
-        i++;
-        if (i > 5) {
-          clearInterval(interval);
-        }
-      }, 1000);
-    }
-  }
 
   return (
     <>
       <div className="card">
         <pre style={{ textAlign: "left" }}>{msg}</pre>
-        <button onClick={startWS}>Start WS</button>
-        <button onClick={() => testWS("darowa")}>Test WS</button>
+        <VideoStream />
+        {/* <button onClick={startWS}>Start WS</button>
         <button onClick={() => setIsStreaming(!isStreaming)}>Stream WS</button>
         <button onClick={() => setIsWatcing(!isWatching)}>
           Watch WS Stream
         </button>
         <video src="" id="video" ref={video} autoPlay controls></video>
-
-        <button onClick={() => video.current?.play()}>Play</button>
+        <button onClick={() => video.current?.play()}>Play</button> */}
 
         <div className="flex flex-row gap-2">
           <form
