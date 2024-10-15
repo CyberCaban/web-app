@@ -1,7 +1,7 @@
-use rocket::{fs::FileServer, route, Build, Rocket};
+use rocket::{fs::FileServer, futures::lock::Mutex, route, Build, Rocket};
 use crate::database::Connection as Conn;
 
-use super::{file_routes, routes, AuthorizationRoutes};
+use super::{file_routes, routes, ws_routes::WSPeers, AuthorizationRoutes};
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
@@ -28,5 +28,9 @@ impl AuthorizationRoutes for Rocket<Build> {
 
     fn manage_db(self) -> Self {
         self.manage(Conn::new())
+    }
+
+    fn manage_ws_users(self) -> Self {
+        self.manage(WSPeers::new())
     }
 }

@@ -11,6 +11,7 @@ use crate::database::Connection;
 use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models;
 use crate::models::User;
+use crate::routes::ws_routes::WSPeers;
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Deserialize)]
@@ -151,17 +152,28 @@ pub fn test_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
 }
 
 #[get("/stream/ws/<user_id>")]
-pub fn stream_ws(ws: ws::WebSocket, user_id: String) -> ws::Channel<'static> {
+pub async fn stream_ws(
+    ws: ws::WebSocket,
+    user_id: String,
+    peers: &State<WSPeers>,
+) -> ws::Channel<'static> {
     use rocket::futures::StreamExt;
+    use rocket::tokio::sync::mpsc::channel;
+    let peers = peers.inner().clone();
+
     println!("{} connected", user_id);
     ws.channel(move |mut stream| {
         Box::pin(async move {
+            let (tx, mut rx) = channel(1);
+            peers.inner().await.insert(user_id.clone(), tx);
             while let Some(msg) = stream.next().await {
                 let msg = msg?;
                 println!("{:?}", msg.len());
+                println!("{:?}", peers.inner().await.keys());
                 let _ = stream.send(msg).await;
             }
             println!("{} disconnected", user_id);
+            peers.inner().await.remove(&user_id);
             Ok(())
         })
     })
