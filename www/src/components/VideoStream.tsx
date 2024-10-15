@@ -13,13 +13,16 @@ export default function VideoStream() {
   const srcBuffer = useRef<SourceBuffer | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const videoWS = useRef<WebSocket | null>(null);
+  const socketid = useRef((Math.random() * 36).toString(36).substring(2));
 
   useEffect(() => {
     console.log("isStreaming", isStreaming);
   }, [isStreaming]);
 
   useEffect(() => {
-    const s = new WebSocket("ws://localhost:5000/api/stream/ws");
+    const s = new WebSocket(
+      `ws://localhost:5000/api/stream/ws/${socketid.current}`
+    );
     s.binaryType = "arraybuffer";
     videoWS.current = s;
     return () => {
@@ -104,18 +107,26 @@ export default function VideoStream() {
             },
             audio: {
               echoCancellation: supported.echoCancellation ? true : false,
-              noiseSuppression: true,
-              sampleRate: 44100,
+              noiseSuppression: supported.noiseSuppression ? true : false,
+              sampleRate: 48000,
             },
           })
-          .then(async (stream) => {
+          .then((stream) => {
+            // eslint-disable-next-line no-constant-condition
+            if (stream.getAudioTracks().length === 0 && 0) {
+              const audioContext = new AudioContext();
+              const emptyAudioTrack = audioContext
+                .createMediaStreamDestination()
+                .stream.getAudioTracks()[0];
+              stream.addTrack(emptyAudioTrack);
+            }
             streamRef.current = stream;
             mediaRecorderRef = new MediaRecorder(stream, {
               mimeType: MIME_TYPE_VIDEO_AUDIO,
             });
+            
             mediaRecorderRef.ondataavailable = (event) => {
               if (videoWS.current) {
-                //   console.log(event.data, event.data.slice(0, 100000, MIME_TYPE));
                 videoWS.current.send(event.data);
               } else {
                 console.log("videoWS.current", videoWS.current);

@@ -150,14 +150,18 @@ pub fn test_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
     }
 }
 
-#[get("/stream/ws")]
-pub fn stream_ws(ws: ws::WebSocket) -> ws::Channel<'static> {
+#[get("/stream/ws/<user_id>")]
+pub fn stream_ws(ws: ws::WebSocket, user_id: String) -> ws::Channel<'static> {
     use rocket::futures::StreamExt;
+    println!("{} connected", user_id);
     ws.channel(move |mut stream| {
         Box::pin(async move {
             while let Some(msg) = stream.next().await {
-                let _ = stream.send(msg?).await;
+                let msg = msg?;
+                println!("{:?}", msg.len());
+                let _ = stream.send(msg).await;
             }
+            println!("{} disconnected", user_id);
             Ok(())
         })
     })
