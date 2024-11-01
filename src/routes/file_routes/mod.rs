@@ -1,8 +1,7 @@
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use rocket::fs::NamedFile;
-use rocket::http::hyper::server::conn;
 use rocket::tokio::io::AsyncReadExt;
-use rocket::{form::Form, fs::TempFile, http::CookieJar, serde::json::Json, State};
+use rocket::{form::Form, fs::TempFile, http::CookieJar, State};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -23,28 +22,33 @@ pub async fn api_upload_file(
     form: Form<UploadRequest<'_>>,
     db: &State<Connection>,
     cookies: &CookieJar<'_>,
-) -> Result<Json<Value>, Value> {
+) -> Value {
     use crate::models::UploadedFile as File;
     use crate::schema::{files, users};
 
     if form.file.content_type().is_none() {
-        return Err(ApiError::new("InvalidFileType", "Invalid file type").to_json());
+        return ApiError::new("InvalidFileType", "Invalid file type").to_json();
     }
     let uploader_id = cookies.get("token");
     if uploader_id.is_none() {
-        return Err(ApiError::new("Unauthorized", "Unauthorized").to_json());
+        return ApiError::new("Unauthorized", "Unauthorized").to_json();
     }
-    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
-
+    let uploader_id = match uploader_id {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => return ApiError::new("InvalidToken", "Invalid token").to_json(),
+        },
+        None => return ApiError::new("Unauthorized", "Unauthorized").to_json(),
+    };
     let mut conn = match db.get() {
         Ok(c) => c,
-        Err(e) => return Err(ApiError::from_error(&e).to_json()),
+        Err(e) => return ApiError::from_error(&e).to_json(),
     };
     match users
         .filter(users::id.eq(uploader_id))
         .first::<User>(&mut *conn)
     {
-        Err(_) => return Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
+        Err(_) => return ApiError::new("UserNotFound", LoginError::UserNotFound).to_json(),
         Ok(_) => (),
     }
 
@@ -76,7 +80,7 @@ pub async fn api_upload_file(
         .values(&new_file)
         .execute(&mut *conn)
     {
-        return Err(ApiError::from_error(&e).to_json());
+        return ApiError::from_error(&e).to_json();
     }
 
     let mut file = form.file.open().await.unwrap();
@@ -92,7 +96,7 @@ pub async fn api_upload_file(
     }
     std::fs::write(file_path, buf).unwrap();
 
-    Ok(Json("File uploaded".into()))
+    json!("File uploaded")
 }
 
 #[get("/file/<file_name>")]
@@ -109,7 +113,19 @@ pub async fn api_get_file(
         let path = std::path::PathBuf::from("tmp").join(file_name);
         return NamedFile::open(path).await.ok();
     }
-    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
+    let uploader_id = match uploader_id {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => {
+                ApiError::new("InvalidToken", "Invalid token").to_json();
+                return None;
+            }
+        },
+        None => {
+            ApiError::new("Unauthorized", "Unauthorized").to_json();
+            return None;
+        }
+    };
     let mut conn = match db.get() {
         Ok(c) => c,
         Err(e) => {
@@ -149,12 +165,17 @@ pub fn api_delete_file(file_name: &str, db: &State<Connection>, cookies: &Cookie
     if uploader_id.is_none() {
         return ApiError::new("Unauthorized", "Unauthorized").to_json();
     }
-    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
-
+    let uploader_id = match uploader_id {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => return ApiError::new("InvalidToken", "Invalid token").to_json(),
+        },
+        None => return ApiError::new("Unauthorized", "Unauthorized").to_json(),
+    };
     let mut conn = connect_db!(db);
     match files
-        .filter(files_schema::name.eq(file_name))
         .filter(files_schema::user_id.eq(uploader_id))
+        .filter(files_schema::name.eq(file_name))
         .first::<File>(&mut *conn)
     {
         Ok(f) => {
@@ -183,6 +204,7 @@ pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
     use crate::models::UploadedFile as File;
     use crate::schema::files as files_schema;
     use diesel::BoolExpressionMethods;
+    
     let mut conn = connect_db!(db);
     let uploader_id = cookies.get("token");
     if uploader_id.is_none() {
@@ -194,7 +216,13 @@ pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
             Err(e) => return ApiError::from_error(&e).to_json(),
         }
     }
-    let uploader_id = Uuid::parse_str(uploader_id.unwrap().value_trimmed()).unwrap();
+    let uploader_id = match uploader_id {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => return ApiError::new("InvalidToken", "Invalid token").to_json(),
+        },
+        None => return ApiError::new("Unauthorized", "Unauthorized").to_json(),
+    };
     match files_schema::table
         .filter(
             files_schema::private

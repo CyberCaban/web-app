@@ -7,24 +7,28 @@ pub struct ApiError {
 }
 impl ApiError {
     pub fn unknown_error() -> Self {
+        eprintln!("Unknown error");
         ApiError {
             error_type: "Unknown Error".to_string(),
             error_msg: "Unknown Error".to_string(),
         }
     }
     pub fn from_message(message: String) -> Self {
+        eprintln!("Error message: {}", message);
         ApiError {
             error_type: "Internal Server Error".to_string(),
             error_msg: message,
         }
     }
     pub fn from_error(error: &impl std::error::Error) -> Self {
+        eprintln!("Error: {}", error);
         ApiError {
             error_type: "Internal Server Error".to_string(),
             error_msg: error.to_string(),
         }
     }
     pub fn new(error_type: &str, error_msg: impl ToString) -> Self {
+        eprintln!("Error: {} {}", error_type, error_msg.to_string());
         ApiError {
             error_type: error_type.to_string(),
             error_msg: error_msg.to_string(),
