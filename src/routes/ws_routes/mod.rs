@@ -5,6 +5,8 @@ use std::{
 };
 use ws::Message;
 
+pub mod routes;
+
 pub type PeersMap = Arc<Mutex<HashMap<String, Sender<Message>>>>;
 #[derive(Clone, Debug)]
 pub struct WSPeers(PeersMap);

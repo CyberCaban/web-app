@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import useUsersWS from "../utils/usersWS";
+import useVideoWS from "../utils/videoWS";
 
 const MIME_TYPE_VIDEO_AUDIO = 'video/webm;codecs="vp8,opus"';
-const MIME_TYPE_VIDEO_ONLY = 'video/webm; codecs="vp8"';
+const MIME_TYPE_VIDEO_ONLY = 'video/webm; codecs="vp9"';
+const MIME_TYPE_AUDIO_ONLY = 'audio/webm; codecs="opus"';
 
 export default function VideoStream() {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -10,24 +13,19 @@ export default function VideoStream() {
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaSource = useRef<MediaSource | null>(null);
-  const srcBuffer = useRef<SourceBuffer | null>(null);
+  const videoBuf = useRef<SourceBuffer | null>(null);
+  const audioBuf = useRef<SourceBuffer | null>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const videoWS = useRef<WebSocket | null>(null);
   const socketid = useRef((Math.random() * 36).toString(36).substring(2));
+  const { users, updateUsers } = useUsersWS(socketid.current);
+  const videoWS = useVideoWS(socketid.current);
 
   useEffect(() => {
     console.log("isStreaming", isStreaming);
   }, [isStreaming]);
 
   useEffect(() => {
-    const s = new WebSocket(
-      `ws://localhost:5000/api/stream/ws/${socketid.current}`
-    );
-    s.binaryType = "arraybuffer";
-    videoWS.current = s;
-    return () => {
-      if (s) s.close();
-    };
+    return () => {};
   }, []);
 
   useEffect(() => {
@@ -43,6 +41,7 @@ export default function VideoStream() {
         mediaSourceRef.onsourceopen = onSourceOpen;
         const objURL = URL.createObjectURL(mediaSourceRef);
         vid.src = objURL;
+        videoWS?.send(objURL);
       } else {
         console.log("onSourceClose");
         mediaSourceRef.onsourceopen = null;
@@ -56,36 +55,39 @@ export default function VideoStream() {
           "isTypeSupported",
           MediaSource.isTypeSupported('video/webm;codecs="vp9"')
         );
-        const sourceBuffer = (srcBuffer.current = mediaSource.addSourceBuffer(
-          MIME_TYPE_VIDEO_AUDIO
-        ));
+        const vidSrcBuffer = (videoBuf.current =
+          mediaSource.addSourceBuffer(MIME_TYPE_VIDEO_ONLY));
         // IMPORTANT:
-        sourceBuffer.mode = "sequence";
+        vidSrcBuffer.mode = "sequence";
+        // const audioSrcBuffer = (audioBuf.current =
+        //   mediaSource.addSourceBuffer(MIME_TYPE_AUDIO_ONLY));
 
-        if (videoWS.current) {
-          videoWS.current.onmessage = (event) => {
+        // eslint-disable-next-line no-constant-condition
+        if (videoWS) {
+          videoWS.onmessage = (event) => {
+            if (typeof event.data === "string") {
+              console.log("event.data", event.data);
+              return;
+            }
+
             const arrayU8 = new Uint8Array(event.data);
             console.log(arrayU8.length);
             if (arrayU8.length === 0) {
-              sourceBuffer.dispatchEvent(new Event("close"));
+              vidSrcBuffer.dispatchEvent(new Event("close"));
             }
 
-            if (
-              srcBuffer.current &&
-              mediaSource.readyState === "open" &&
-              !sourceBuffer.updating
-            ) {
+            if (vidSrcBuffer && videoBuf.current && !vidSrcBuffer.updating) {
               try {
-                srcBuffer.current.appendBuffer(arrayU8);
+                vidSrcBuffer.appendBuffer(arrayU8);
               } catch (e) {
                 console.log("no sourceBuffer", e);
               }
             }
           };
-          sourceBuffer.onupdateend = (e) => {
-            //   console.log("updateend", e);
+          vidSrcBuffer.onupdateend = (e) => {
+            // console.log("updateend", e);
           };
-          sourceBuffer.onerror = (e) => {
+          vidSrcBuffer.onerror = (e) => {
             console.log("error sourceBuffer", mediaSource);
           };
         }
@@ -95,42 +97,38 @@ export default function VideoStream() {
   }, [isWatching]);
 
   useEffect(() => {
+    function getMediaStream() {
+      return navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        // audio: true,
+      });
+    }
     function toggleStreaming() {
       let mediaRecorderRef = mediaRecorder.current;
 
       if (isStreaming) {
-        const supported = navigator.mediaDevices.getSupportedConstraints();
-        navigator.mediaDevices
-          .getDisplayMedia({
-            video: {
-              aspectRatio: 16 / 9,
-            },
-            audio: {
-              echoCancellation: supported.echoCancellation ? true : false,
-              noiseSuppression: supported.noiseSuppression ? true : false,
-              sampleRate: 48000,
-            },
-          })
-          .then((stream) => {
-            // eslint-disable-next-line no-constant-condition
-            if (stream.getAudioTracks().length === 0 && 0) {
-              const audioContext = new AudioContext();
-              const emptyAudioTrack = audioContext
-                .createMediaStreamDestination()
-                .stream.getAudioTracks()[0];
-              stream.addTrack(emptyAudioTrack);
+        getMediaStream()
+          .then((mediaStream) => {
+            // const audioContext = new AudioContext();
+            // const emptyAudioTrack = audioContext
+            //   .createMediaStreamDestination()
+            //   .stream.getAudioTracks()[0];
+            // mediaStream.addTrack(emptyAudioTrack);
+            console.log("stream", mediaStream.getAudioTracks());
+
+            // eslint-disable-next-line no-constant-condition, no-empty
+            if (mediaStream.getAudioTracks().length === 0 && 0) {
             }
-            streamRef.current = stream;
-            mediaRecorderRef = new MediaRecorder(stream, {
-              mimeType: MIME_TYPE_VIDEO_AUDIO,
+            streamRef.current = mediaStream;
+            mediaRecorderRef = new MediaRecorder(mediaStream, {
+              mimeType: MIME_TYPE_VIDEO_ONLY,
             });
-            
+
             mediaRecorderRef.ondataavailable = (event) => {
-              if (videoWS.current) {
-                videoWS.current.send(event.data);
+              if (videoWS) {
+                videoWS.send(event.data);
               } else {
-                console.log("videoWS.current", videoWS.current);
-                videoWS.current = null;
+                console.log("videoWS.current", videoWS);
               }
             };
             mediaRecorderRef.start(1000);
@@ -145,7 +143,7 @@ export default function VideoStream() {
       } else {
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
-          videoWS.current?.send(new Uint8Array(0));
+          videoWS?.send(new Uint8Array(0));
         }
 
         //   if (mediaRecorder.current) {
@@ -164,11 +162,35 @@ export default function VideoStream() {
         Toggle Streaming
       </button>
       <button onClick={() => setIsWatching(!isWatching)}>Toggle Watch</button>
+      <button onClick={updateUsers}>Update Users</button>
+      {users.map((u) => (
+        <div
+          key={u}
+          onClick={() => {
+            videoWS?.send(u);
+            // const s = new WebSocket(`ws://localhost:5000/api/watch/ws/${u}`);
+            // s.binaryType = "arraybuffer";
+            // s.onmessage = (event) => {
+            //   const arrayU8 = new Uint8Array(event.data);
+            //   console.log(arrayU8.length);
+            //   if (videoBuf.current && !videoBuf.current.updating) {
+            //     videoBuf.current.appendBuffer(arrayU8);
+            //   }
+            // };
+            // s.onopen = () => {
+            //   s.close()
+            // }
+          }}
+        >
+          {u}
+        </div>
+      ))}
       <video
         autoPlay
+        // controls
+        muted
         id="video"
         ref={video}
-        controls
         onClick={() => {
           if (!video.current) return;
           video.current.play();

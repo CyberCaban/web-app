@@ -127,58 +127,6 @@ pub fn api_logout(cookies: &CookieJar<'_>) -> Value {
     json!("Logged out")
 }
 
-#[get("/ws")]
-pub fn test_ws(ws: ws::WebSocket) -> ws::Stream!['static] {
-    ws::Stream! {
-        ws => {
-            for await msg in ws {
-                let msg_text: Message = match msg {
-                    Ok(msg) => msg,
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        continue;
-                    },
-                };
-                let data = msg_text.clone().into_data();
-                for i in data {
-                    print!("{} ", i);
-                }
-                println!("");
-                let out = format!("Hello, {}!", msg_text.into_text().unwrap());
-                yield out.into();
-            }
-        }
-    }
-}
-
-#[get("/stream/ws/<user_id>")]
-pub async fn stream_ws(
-    ws: ws::WebSocket,
-    user_id: String,
-    peers: &State<WSPeers>,
-) -> ws::Channel<'static> {
-    use rocket::futures::StreamExt;
-    use rocket::tokio::sync::mpsc::channel;
-    let peers = peers.inner().clone();
-
-    println!("{} connected", user_id);
-    ws.channel(move |mut stream| {
-        Box::pin(async move {
-            let (tx, mut rx) = channel(1);
-            peers.inner().await.insert(user_id.clone(), tx);
-            while let Some(msg) = stream.next().await {
-                let msg = msg?;
-                println!("{:?}", msg.len());
-                println!("{:?}", peers.inner().await.keys());
-                let _ = stream.send(msg).await;
-            }
-            println!("{} disconnected", user_id);
-            peers.inner().await.remove(&user_id);
-            Ok(())
-        })
-    })
-}
-
 #[get("/toro", format = "html")]
 pub fn toro() -> RawHtml<String> {
     let toro: &str = "
